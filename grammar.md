@@ -10,7 +10,7 @@ C\* is a tiny subset of the programming language C. C\* features global variable
 
 C\* Keywords: `uint64_t`, `void`, `if`, `else`, `while`, `return`
 
-C\* Symbols: `integer`, `character`, `string`, `identifier`, `,`, `;`, `(`, `)`, `{`, `}`, `+`, `-`, `*`, `/`, `%`, `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`
+C\* Symbols: `integer`, `character`, `string`, `identifier`, `,`, `;`, `(`, `)`, `{`, `}`, `+`, `-`, `*`, `/`, `%`, `=`, `==`, `!=`, `<`, `<=`, `>`, `>=`,`>>`, `<<`
 
 with:
 
@@ -27,6 +27,7 @@ identifier = letter { letter | digit | "_" } .
 and:
 
 ```
+
 digit  = "0" | ... | "9" .
 
 letter = "a" | ... | "z" | "A" | ... | "Z" .
@@ -55,7 +56,9 @@ statement        = call ";" | while | if | return ";" |
 
 call             = identifier "(" [ expression { "," expression } ] ")" .
 
-expression       = simpleExpression [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) simpleExpression ] .
+expression       = bitwiseExpression [ ( "==" | "!=" | "<" | ">" | "<=" | ">=" ) bitwiseExpression ] .
+
+bitwiseExpression = simpleExpression { ( "<<" | ">>" ) simpleExpression } .
 
 simpleExpression = term { ( "+" | "-" ) term } .
 

@@ -385,11 +385,16 @@ uint64_t SYM_LEQ          = 25; // <=
 uint64_t SYM_GT           = 26; // >
 uint64_t SYM_GEQ          = 27; // >=
 
+
 // symbols for bootstrapping
 
 uint64_t SYM_INT      = 28; // int
 uint64_t SYM_CHAR     = 29; // char
 uint64_t SYM_UNSIGNED = 30; // unsigned
+uint64_t SYM_SLL = 31; // unsigned
+uint64_t SYM_SRL = 32; // unsigned
+
+
 
 uint64_t* SYMBOLS; // strings representing symbols
 
@@ -588,6 +593,7 @@ uint64_t is_expression();
 uint64_t is_literal();
 uint64_t is_star_or_div_or_modulo();
 uint64_t is_plus_or_minus();
+uint64_t is_sll_or_srl();
 uint64_t is_comparison();
 
 uint64_t look_for_factor();
@@ -616,6 +622,7 @@ uint64_t compile_call(char* procedure);
 uint64_t compile_factor();
 uint64_t compile_term();
 uint64_t compile_simple_expression();
+uint64_t compile_bitwise_expression();
 uint64_t compile_expression();
 void     compile_while();
 void     compile_if();
@@ -834,6 +841,8 @@ uint64_t F7_SUB  = 32; // 0100000
 uint64_t F7_DIVU = 1;  // 0000001
 uint64_t F7_REMU = 1;  // 0000001
 uint64_t F7_SLTU = 0;  // 0000000
+uint64_t F7_SLL = 0; 
+uint64_t F7_SRL = 0; 
 
 // f12-codes (immediates)
 uint64_t F12_ECALL = 0; // 000000000000
@@ -874,6 +883,11 @@ void emit_addi(uint64_t rd, uint64_t rs1, uint64_t immediate);
 
 void emit_add(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void emit_sub(uint64_t rd, uint64_t rs1, uint64_t rs2);
+// define the sll and srl emit function
+void emit_sll(uint64_t rd, uint64_t rs1, uint64_t rs2);
+void emit_srl(uint64_t rd, uint64_t rs1, uint64_t rs2);
+//
+//
 void emit_mul(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void emit_divu(uint64_t rd, uint64_t rs1, uint64_t rs2);
 void emit_remu(uint64_t rd, uint64_t rs1, uint64_t rs2);
@@ -1095,6 +1109,12 @@ void print_add_sub_mul_divu_remu_sltu(char *mnemonics);
 void print_add_sub_mul_divu_remu_sltu_before();
 
 void do_add();
+
+// sll and sel
+// 
+void do_sll();
+void do_srl();
+//
 void constrain_add_sub_mul_divu_remu_sltu(char* operator);
 
 void do_sub();
@@ -3143,6 +3163,15 @@ uint64_t is_plus_or_minus() {
     return 0;
 }
 
+uint64_t is_sll_or_srl() {
+  if (symbol == SYM_SLL)
+    return 1;
+  else if (symbol == SYM_SRL)
+    return 1;
+  else
+    return 0;
+}
+
 uint64_t is_comparison() {
   if (symbol == SYM_EQUALITY)
     return 1;
@@ -3893,7 +3922,7 @@ uint64_t compile_simple_expression() {
   return ltype;
 }
 
-uint64_t compile_expression() {
+uint64_t compile_bitwise_expression() {
   uint64_t ltype;
   uint64_t operator_symbol;
   uint64_t rtype;
@@ -3901,6 +3930,79 @@ uint64_t compile_expression() {
   // assert: n = allocated_temporaries
 
   ltype = compile_simple_expression();
+
+  // assert: allocated_temporaries == n + 1
+
+  // << or >> ?
+  while (is_sll_or_srl()) {
+    operator_symbol = symbol;
+
+    get_symbol();
+
+    rtype = compile_simple_expression();
+
+    // assert: allocated_temporaries == n + 2
+
+    if (operator_symbol == SYM_PLUS) {
+      if (ltype == UINT64STAR_T) {
+        if (rtype == UINT64_T)
+          // UINT64STAR_T + UINT64_T
+          // pointer arithmetic: factor of 2^3 of integer operand
+          emit_left_shift_by(current_temporary(), 3);
+        else
+          // UINT64STAR_T + UINT64STAR_T
+          syntax_error_message("(uint64_t*) + (uint64_t*) is undefined");
+      } else if (rtype == UINT64STAR_T) {
+        // UINT64_T + UINT64STAR_T
+        // pointer arithmetic: factor of 2^3 of integer operand
+        emit_left_shift_by(previous_temporary(), 3);
+
+        ltype = UINT64STAR_T;
+      }
+      //changed to sll emit
+      emit_sll(previous_temporary(), previous_temporary(), current_temporary());
+
+    } else if (operator_symbol == SYM_MINUS) {
+      if (ltype == UINT64STAR_T) {
+        if (rtype == UINT64_T) {
+          // UINT64STAR_T - UINT64_T
+          // pointer arithmetic: factor of 2^3 of integer operand
+          emit_left_shift_by(current_temporary(), 3);
+          emit_sub(previous_temporary(), previous_temporary(), current_temporary());
+        } else {
+          // UINT64STAR_T - UINT64STAR_T
+          // pointer arithmetic: (left_term - right_term) / SIZEOFUINT64
+          emit_sub(previous_temporary(), previous_temporary(), current_temporary());
+          emit_addi(current_temporary(), REG_ZR, SIZEOFUINT64);
+          emit_divu(previous_temporary(), previous_temporary(), current_temporary());
+
+          ltype = UINT64_T;
+        }
+      } else if (rtype == UINT64STAR_T)
+        // UINT64_T - UINT64STAR_T
+        syntax_error_message("(uint64_t) - (uint64_t*) is undefined");
+      else
+        // UINT64_T - UINT64_T
+        // //changed to srl emit
+        emit_srl(previous_temporary(), previous_temporary(), current_temporary());
+    }
+
+    tfree(1);
+  }
+
+  // assert: allocated_temporaries == n + 1
+
+  return ltype;
+}
+
+uint64_t compile_expression() {
+  uint64_t ltype;
+  uint64_t operator_symbol;
+  uint64_t rtype;
+
+  // assert: n = allocated_temporaries
+
+  ltype = compile_bitwise_expression();
 
   // assert: allocated_temporaries == n + 1
 
@@ -5422,6 +5524,25 @@ void emit_sub(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   ic_sub = ic_sub + 1;
 }
 
+
+// added functions for compile_bitwise_Expression
+// 
+void emit_sll(uint64_t rd, uint64_t rs1, uint64_t rs2) {
+  emit_instruction(encode_r_format(F7_ADD, rs2, rs1, F3_ADD, rd, OP_OP));
+
+  ic_add = ic_add + 1;
+}
+
+void emit_srl(uint64_t rd, uint64_t rs1, uint64_t rs2) {
+  emit_instruction(encode_r_format(F7_SUB, rs2, rs1, F3_SUB, rd, OP_OP));
+
+  ic_sub = ic_sub + 1;
+}
+
+
+//
+//
+
 void emit_mul(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   emit_instruction(encode_r_format(F7_MUL, rs2, rs1, F3_MUL, rd, OP_OP));
 
@@ -6738,6 +6859,38 @@ void do_add() {
   ic_add = ic_add + 1;
 }
 
+
+
+//ssl and srl modifications
+
+void do_sll() {
+  if (rd != REG_ZR)
+    // semantics of add
+    *(registers + rd) = *(registers + rs1) << *(registers + rs2);
+
+  pc = pc + INSTRUCTIONSIZE;
+
+  ic_add = ic_add + 1;
+}
+
+
+void do_srl() {
+  if (rd != REG_ZR)
+    // semantics of sub
+    *(registers + rd) = *(registers + rs1) >> *(registers + rs2);
+
+  pc = pc + INSTRUCTIONSIZE;
+
+  ic_sub = ic_sub + 1;
+}
+
+
+//
+
+
+
+
+
 void constrain_add_sub_mul_divu_remu_sltu(char* operator) {
   char* op1;
   char* op2;
@@ -7757,7 +7910,24 @@ void decode_execute() {
           do_sub();
 
         return;
-      } else if (funct7 == F7_MUL) {
+      }
+      
+      //sll and slr modification debuger deleted re-check it later
+      else if (funct7 == F7_SRL) {
+          do_srl();
+        return;
+      } 
+      else if (funct7 == F7_SLL) {
+          do_sll();
+        return;
+      } 
+
+      //
+
+
+
+
+      else if (funct7 == F7_MUL) {
         if (debug) {
           if (record) {
             record_lui_addi_add_sub_mul_sltu_jal_jalr();
@@ -8738,6 +8908,7 @@ uint64_t handle_division_by_zero(uint64_t* context) {
 
   return EXIT;
 }
+
 
 uint64_t handle_timer(uint64_t* context) {
   set_exception(context, EXCEPTION_NOEXCEPTION);
