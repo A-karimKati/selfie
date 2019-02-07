@@ -2,10 +2,13 @@
 Copyright (c) 2015-2019, the Selfie Project authors. All rights reserved.
 Please see the AUTHORS file for details. Use of this source code is
 governed by a BSD license that can be found in the LICENSE file.
+
 Selfie is a project of the Computational Systems Group at the
 Department of Computer Sciences of the University of Salzburg
 in Austria. For further information and code please refer to:
+
 http://selfie.cs.uni-salzburg.at
+
 The Selfie Project provides an educational platform for teaching
 undergraduate and graduate students the design and implementation
 of programming languages and runtime systems. The focus is on the
@@ -13,7 +16,9 @@ construction of compilers, libraries, operating systems, and even
 virtual machine monitors. The common theme is to identify and
 resolve self-reference in systems code which is seen as the key
 challenge when teaching systems engineering, hence the name.
+
 Selfie is a self-contained 64-bit, 10-KLOC C implementation of:
+
 1. a self-compiling compiler called starc that compiles
    a tiny but still fast subset of C called C Star (C*) to
    a tiny and easy-to-teach subset of RISC-V called RISC-U,
@@ -28,10 +33,12 @@ Selfie is a self-contained 64-bit, 10-KLOC C implementation of:
    with non-zero exit codes,
 5. a simple SAT solver that reads CNF DIMACS files, and
 6. a tiny C* library called libcstar utilized by selfie.
+
 Selfie is implemented in a single (!) file and kept minimal for simplicity.
 There is also a simple in-memory linker, a RISC-U disassembler, a profiler,
 and a debugger with replay as well as minimal operating system support in
 the form of RISC-V system calls built into the emulator.
+
 C* is a tiny Turing-complete subset of C that includes dereferencing
 (the * operator) but excludes composite data types, bitwise and Boolean
 operators, and many other features. There are only unsigned 64-bit
@@ -43,16 +50,19 @@ arithmetics helping students better understand arithmetic operators.
 C* is supposed to be close to the minimum necessary for implementing
 a self-compiling, single-pass, recursive-descent compiler. C* can be
 taught in one to two weeks of classes depending on student background.
+
 The compiler can readily be extended to compile features missing in C*
 and to improve performance of the generated code. The compiler generates
 RISC-U executables in ELF format that are compatible with the official
 RISC-V toolchain. The mipster emulator can execute RISC-U executables
 loaded from file but also from memory immediately after code generation
 without going through the file system.
+
 RISC-U is a tiny Turing-complete subset of the RISC-V instruction set.
 It only features unsigned 64-bit integer arithmetic, double-word memory,
 and simple control-flow instructions but neither bitwise nor byte- and
 word-level instructions. RISC-U can be taught in one week of classes.
+
 The emulator implements minimal operating system support that is meant
 to be extended by students, first as part of the emulator, and then
 ported to run on top of it, similar to an actual operating system or
@@ -61,11 +71,13 @@ helps exposing the self-referential nature of that challenge. In fact,
 selfie goes one step further by implementing microkernel functionality
 as part of the emulator and a hypervisor that can run as part of the
 emulator as well as on top of it, all with the same code.
+
 The symbolic execution engine implements a simple yet sound and
 complete translation of RISC-U code to SMT-LIB formulae. The SAT
 solver implements a naive brute-force enumeration of all possible
 variable assignments. Both engine and solver facilitate teaching
 the absolute basics of SAT and SMT solving applied to real code.
+
 Selfie is the result of many years of teaching systems engineering.
 The design of the compiler is inspired by the Oberon compiler of
 Professor Niklaus Wirth from ETH Zurich. RISC-U is inspired by the
@@ -372,14 +384,14 @@ uint64_t SYM_LT           = 24; // <
 uint64_t SYM_LEQ          = 25; // <=
 uint64_t SYM_GT           = 26; // >
 uint64_t SYM_GEQ          = 27; // >=
-uint64_t SYM_SLL          = 28; // <<
-uint64_t SYM_SRL          = 29; // >>
+uint64_t SYM_SLL          = 29; // <<
+uint64_t SYM_SRL          = 28; // >>
 
 // symbols for bootstrapping
 
-uint64_t SYM_INT      = 28; // int
-uint64_t SYM_CHAR     = 29; // char
-uint64_t SYM_UNSIGNED = 30; // unsigned
+uint64_t SYM_INT      = 30; // int
+uint64_t SYM_CHAR     = 31; // char
+uint64_t SYM_UNSIGNED = 32; // unsigned
 
 uint64_t* SYMBOLS; // strings representing symbols
 
@@ -445,6 +457,10 @@ void init_scanner () {
   *(SYMBOLS + SYM_LEQ)          = (uint64_t) "<=";
   *(SYMBOLS + SYM_GT)           = (uint64_t) ">";
   *(SYMBOLS + SYM_GEQ)          = (uint64_t) ">=";
+
+  *(SYMBOLS + SYM_SLL)          = (uint64_t) "<<";
+  *(SYMBOLS + SYM_SRL)          = (uint64_t) ">>";
+
 
   *(SYMBOLS + SYM_INT)      = (uint64_t) "int";
   *(SYMBOLS + SYM_CHAR)     = (uint64_t) "char";
@@ -818,8 +834,8 @@ uint64_t F3_SD    = 3; // 011
 uint64_t F3_BEQ   = 0; // 000
 uint64_t F3_JALR  = 0; // 000
 uint64_t F3_ECALL = 0; // 000
-uint64_t F3_SLL = 1;
-uint64_t F3_SRL = 5;
+uint64_t F3_SLL   = 1;
+uint64_t F3_SRL   = 5;
 
 
 
@@ -1846,9 +1862,9 @@ char* store_character(char* s, uint64_t i, uint64_t c) {
 }
 
 char* string_alloc(uint64_t l) {
-  // allocates zeroed memory for a string of l characters
+	// allocates zeroed memory for a string of l characters
   // plus a null terminator aligned to machine word size
-  return (char*) zalloc(l + 1);
+	return (char*) zalloc(l + 1);
 }
 
 uint64_t string_length(char* s) {
@@ -3872,14 +3888,15 @@ uint64_t compile_bitwise_expression() {
         if (rtype == UINT64_T)
           // UINT64STAR_T + UINT64_T
           // pointer arithmetic: factor of 2^3 of integer operand
-          emit_left_shift_by(current_temporary(), 3);
+          syntax_error_message("(uint64_t*) << (uint64_t) is undefined");
+
         else
           // UINT64STAR_T + UINT64STAR_T
-          syntax_error_message("(uint64_t*) + (uint64_t*) is undefined");
+          syntax_error_message("(uint64_t*) << (uint64_t*) is undefined");
       } else if (rtype == UINT64STAR_T) {
         // UINT64_T + UINT64STAR_T
         // pointer arithmetic: factor of 2^3 of integer operand
-        emit_left_shift_by(previous_temporary(), 3);
+        syntax_error_message("(uint64_t) << (uint64_t*) is undefined");
 
         ltype = UINT64STAR_T;
       }
@@ -3889,22 +3906,15 @@ uint64_t compile_bitwise_expression() {
     } else if (operator_symbol == SYM_SRL) {
       if (ltype == UINT64STAR_T) {
         if (rtype == UINT64_T) {
-          // UINT64STAR_T - UINT64_T
-          // pointer arithmetic: factor of 2^3 of integer operand
-          emit_left_shift_by(current_temporary(), 3);
-          emit_sub(previous_temporary(), previous_temporary(), current_temporary());
+          syntax_error_message("(uint64_t*) >> (uint64_t) is undefined");
         } else {
-          // UINT64STAR_T - UINT64STAR_T
-          // pointer arithmetic: (left_term - right_term) / SIZEOFUINT64
-          emit_sub(previous_temporary(), previous_temporary(), current_temporary());
-          emit_addi(current_temporary(), REG_ZR, SIZEOFUINT64);
-          emit_divu(previous_temporary(), previous_temporary(), current_temporary());
+          syntax_error_message("(uint64_t*) >> (uint64_t*) is undefined");
 
           ltype = UINT64_T;
         }
       } else if (rtype == UINT64STAR_T)
         // UINT64_T - UINT64STAR_T
-        syntax_error_message("(uint64_t) - (uint64_t*) is undefined");
+        syntax_error_message("(uint64_t) >> (uint64_t*) is undefined");
       else
         // UINT64_T - UINT64_T
         emit_srl(previous_temporary(), previous_temporary(), current_temporary());
@@ -5551,7 +5561,6 @@ void emit_divu(uint64_t rd, uint64_t rs1, uint64_t rs2) {
 
   ic_divu = ic_divu + 1;
 }
-
 
 void emit_remu(uint64_t rd, uint64_t rs1, uint64_t rs2) {
   emit_instruction(encode_r_format(F7_REMU, rs2, rs1, F3_REMU, rd, OP_OP));
@@ -7945,6 +7954,12 @@ void decode_execute() {
 
         return;
       }
+      else if (funct7 == F7_SRL) {
+
+          do_srl();
+
+        return;
+      }
     } else if (funct3 == F3_REMU) {
       if (funct7 == F7_REMU) {
         if (debug) {
@@ -7997,15 +8012,7 @@ void decode_execute() {
         return;
       }
     }
-    // MY CODE RUN
-    else if (funct3 == F3_SRL) {
-      if (funct7 == F7_SRL) {
 
-          do_srl();
-
-        return;
-      }
-    }
     else if (funct3 == F3_SLL) {
       if (funct7 == F7_SLL) {
 
@@ -8774,10 +8781,12 @@ uint64_t up_load_string(uint64_t* context, char* s, uint64_t SP) {
 
 void up_load_arguments(uint64_t* context, uint64_t argc, uint64_t* argv) {
   /* upload arguments like a UNIX system
+
       SP
       |
       V
    | argc | argv[0] | ... | argv[n] | 0 | env[0] | ... | env[m] | 0 |
+
      with argc > 0, n == argc - 1, and m == 0 (that is, env is empty) */
   uint64_t SP;
   uint64_t* vargv;
